@@ -1,7 +1,8 @@
 ## Project setup
 
 ```bash
-$ yarn install
+$ cd task-api && yarn install
+$ cd ../task-worker/worker && yarn install
 ```
 
 ## Compile and run the project
@@ -31,5 +32,26 @@ $ yarn migration:create MigrationName
 
 ##Docker
 ````bash
-docker compose up --build
+# Сборка и запуск всех сервисов
+$ docker compose up --build -d
+
+# Просмотр логов
+$ docker compose logs -f api worker
+
+# Остановка сервисов
+$ docker compose down
+
+# Полная очистка (включая volumes)
+$ docker compose down -v
+````
+
+````bash
+# Применение конфигураций
+$ kubectl apply -f k8s/
+
+# Проверка состояния
+$ kubectl get pods -w
+
+# Масштабирование worker
+$ kubectl scale deployment worker --replicas=3
 ````

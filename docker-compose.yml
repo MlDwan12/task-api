@@ -7,12 +7,42 @@ services:
     ports:
       - '3000:3000'
     depends_on:
-      - db
-      - rabbitmq
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/tasks_db
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/tasks_db?schema=public
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
-    restart: always
+      - PORT=3000
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./task-worker/worker
+      dockerfile: Dockerfile
+    container_name: task-worker
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/tasks_db?schema=public
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
 
   db:
     image: postgres:15
@@ -25,18 +55,32 @@ services:
       - '5434:5432'
     volumes:
       - pg_data:/var/lib/postgresql/data
-    restart: always
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3-management
     container_name: task-rabbitmq
+    hostname: rabbitmq
     ports:
       - '5672:5672'
       - '15672:15672'
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-    restart: always
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'status']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
 
 volumes:
   pg_data:
+  rabbitmq_data:

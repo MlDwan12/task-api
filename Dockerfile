@@ -1,19 +1,19 @@
-# Dockerfile
-
-# Базовый образ
 FROM node:20-alpine
 
+# Создаем рабочую директорию
 WORKDIR /usr/src/app
 
-COPY package*.json ./
-COPY yarn.lock ./
+# Копируем файлы зависимостей
+COPY package.json yarn.lock ./
 
+# Устанавливаем зависимости
 RUN yarn install --frozen-lockfile
 
+# Копируем все файлы проекта
 COPY . .
 
+# Собираем проект
 RUN yarn build
 
-EXPOSE 3000
-
+# Команда запуска
 CMD ["node", "dist/main"]

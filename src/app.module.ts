@@ -9,6 +9,7 @@ import { HealthService } from './health/health.service';
 import { HealthModule } from './health/health.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { rabbitConfig } from './config/rabbit.config';
+import { RabbitMQModule } from './rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -17,19 +18,7 @@ import { rabbitConfig } from './config/rabbit.config';
       inject: [ConfigService],
       useFactory: () => typeOrmConfig,
     }),
-    ClientsModule.register([
-      {
-        name: 'TASK_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: [rabbitConfig.uri],
-          queue: rabbitConfig.queue,
-          queueOptions: {
-            durable: true,
-          },
-        },
-      },
-    ]),
+    RabbitMQModule,
     TasksModule,
     HealthModule,
   ],

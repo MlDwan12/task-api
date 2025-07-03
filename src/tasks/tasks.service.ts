@@ -3,6 +3,7 @@ import {
   NotFoundException,
   InternalServerErrorException,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -11,9 +12,12 @@ import { PaginationQueryDto } from './dto/get-task-query.dto';
 import { TaskResponseDto } from './dto/task-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { ClientProxy } from '@nestjs/microservices';
+import { TaskStatus } from 'src/common/enums/task-status.enum';
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     private readonly taskRepo: TaskRepository,
     @Inject('TASK_SERVICE') private readonly taskClient: ClientProxy,
@@ -21,16 +25,52 @@ export class TasksService {
 
   async create(dto: CreateTaskDto): Promise<TaskResponseDto> {
     try {
-      const newTask = await this.taskRepo.create(dto);
+      const newTask = await this.taskRepo.create({
+        ...dto,
+      });
 
-      this.taskClient.emit('task_created', newTask);
+      this.taskClient.emit('task_created', {
+        id: newTask.id,
+        action: 'process',
+      });
+
+      this.logger.log(`Task created: ${newTask.id}`);
 
       return plainToInstance(TaskResponseDto, newTask, {
         excludeExtraneousValues: true,
       });
     } catch (error) {
+      this.logger.error(`Failed to create task: ${error.message}`);
       throw new InternalServerErrorException('Не удалось создать задачу');
     }
+  }
+
+  async startProcessing(taskId: string) {
+    const updated = await this.taskRepo.update(taskId, {
+      status: TaskStatus.PROCESSING,
+      startedAt: new Date(),
+    });
+
+    if (!updated) {
+      throw new NotFoundException(`Задача с id ${taskId} не найдена`);
+    }
+
+    this.logger.log(`Task processing started: ${taskId}`);
+    return updated;
+  }
+
+  async completeProcessing(taskId: string) {
+    const updated = await this.taskRepo.update(taskId, {
+      status: TaskStatus.COMPLETED,
+      completedAt: new Date(),
+    });
+
+    if (!updated) {
+      throw new NotFoundException(`Задача с id ${taskId} не найдена`);
+    }
+
+    this.logger.log(`Task completed: ${taskId}`);
+    return updated;
   }
 
   async findAll(paginationQuery: PaginationQueryDto) {
